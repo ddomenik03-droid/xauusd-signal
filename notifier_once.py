@@ -21,7 +21,7 @@ def fetch_klines():
     last = None
     for host in HOSTS:
         try:
-            url = f"{host}/api/v3/klines?symbol={SYMBOL}&interval={TF}&limit=180"
+            url = f"{host}/api/v3/klines?symbol={SYMBOL}&interval={TF}&limit=300"
             req = urllib.request.Request(url, headers={"User-Agent": "xau-notifier"})
             with urllib.request.urlopen(req, timeout=20) as r:
                 raw = json.load(r)
@@ -156,8 +156,8 @@ def detect_pattern(cd):
 def compute_signal(cd):
     closes = [x["c"] for x in cd]; highs = [x["h"] for x in cd]; lows = [x["l"] for x in cd]
     price = closes[-1]
-    e20 = ema(closes, 20); e50 = ema(closes, 50)
-    ema20 = e20[-1]; ema50 = e50[-1]
+    e20 = ema(closes, 20); e50 = ema(closes, 50); e200 = ema(closes, 200)
+    ema20 = e20[-1]; ema50 = e50[-1]; ema200 = e200[-1]
     rsi = rsi_last(closes); macd = macd_last(closes); atr = atr_last(highs, lows, closes)
     st = stoch_last(highs, lows, closes); bo = boll_last(closes); adx = adx_last(highs, lows, closes)
     sr = support_resistance(highs, lows, price); pat = detect_pattern(cd)
@@ -179,6 +179,10 @@ def compute_signal(cd):
     if pat == "bull": sc += 0.5
     elif pat == "bear": sc -= 0.5
     direction = "buy" if sc >= 3 else ("sell" if sc <= -3 else "neutral")
+    # Trendfilter: nur in Richtung des 200er-Trends handeln (belegt bessere Trefferquote)
+    if len(closes) >= 200:
+        if direction == "buy" and price < ema200: direction = "neutral"
+        elif direction == "sell" and price > ema200: direction = "neutral"
     entry = price; sl = tp = None
     if direction == "buy": sl = price - 1.5 * atr; tp = price + 3 * atr
     elif direction == "sell": sl = price + 1.5 * atr; tp = price - 3 * atr
