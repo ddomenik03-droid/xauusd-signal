@@ -1,0 +1,36 @@
+name: XAUUSD Signal Notifier
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'      # alle 5 Minuten (GitHub-Minimum)
+  workflow_dispatch: {}         # erlaubt manuelles Starten per Knopf
+
+permissions:
+  contents: write               # noetig, um state.json zurueckzuschreiben
+
+concurrency:
+  group: signal-notifier
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Signal pruefen & ggf. Push senden
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_SERVER: ${{ secrets.NTFY_SERVER }}   # optional, Standard: https://ntfy.sh
+        run: python notifier_once.py
+
+      - name: Zustand speichern
+        run: |
+          git config user.name "signal-bot"
+          git config user.email "signal-bot@users.noreply.github.com"
+          git add state.json
+          git diff --staged --quiet || (git commit -m "update state [skip ci]" && git push)
